@@ -5,8 +5,8 @@
 #include "nvs_flash.h"
 #include "freertos/queue.h"
 
-static const char *tag = "LWBT"; // Device name(as seen by connected devices)
-uint8_t obex_cid = 0;            // Obex connection id, modified on ftp recieving connection request
+static const char *tag = "BT-ADV"; // Device name(as seen by connected devices)
+uint8_t obex_cid = 0;              // Obex connection id, modified on ftp recieving connection request
 uint8_t connected = 0;
 uint16_t src_cid = 0;     // L2CAP sourde id, modified on L2CAP connection request
 uint16_t dest_cid = 0x41; // L2CAP Destination id, incremented for each new connection
@@ -346,7 +346,10 @@ void obex_ftp(uint8_t *packet, uint16_t len)
                 // Contains file contents
                 else if (packet[i] == 0x48)
                 {
-                    // To store the recieved file malloc memory of size "file_len".
+                    /*
+                     * To store the recieved file malloc memory of size "file_len".
+                     * 
+                     */
                     uint16_t head_len = packet[i + 1] * 256 + packet[i + 2];
                     // printf("File contents : \n");
                     // Just suming the file contents
