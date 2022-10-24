@@ -4,8 +4,8 @@ This project aims to provide file-sharing capabilities between the ESP32 Bluetoo
 # Usage  
 To run the code you would need an ESP32 board and ESP-IDF installed on your computer. (Steps listed for Linux systems)  
 ## Project Configuration
-1. Run "$ idf.py menuconfig" in the project folder after cloning the repo, this would open the config menu. Navigate to Component Config --> Bluetooth, enable the Bluetooth option and from here navigate to Bluetooth controller --> Bluetooth controller mode --> BR/EDR Only. In the Bluetooth controller options select HCI mode and set it to VHCI. Select Controller only in the Bluetooth host menu and press S to save your config.   
-2. Run "$ idf.py set-target esp32" (or any other esp32 model) to set the MCU type.
+1. Run "$ idf.py set-target esp32" (or any other esp32 model) to set the MCU type.
+2. Run "$ idf.py menuconfig" in the project folder after cloning the repo, this would open the config menu. Navigate to Component Config --> Bluetooth, enable the Bluetooth option and from here navigate to Bluetooth controller --> Bluetooth controller mode --> BR/EDR Only. In the Bluetooth controller options select HCI mode and set it to VHCI. Select Controller only in the Bluetooth host menu and press S to save your config.   
 3. Run "$ idf.py build" to compile and link the source files.  
 4. Plug in the ESP32 board and run "$ idf.py flash" to upload the generated binary to the microcontroller.  
 5. Optionally run "$ idf.py monitor" to view the serial output.   
