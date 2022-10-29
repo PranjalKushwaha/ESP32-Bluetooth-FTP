@@ -960,20 +960,14 @@ void init_bt()
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
-    esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
-
+    
     // Release BLE memory
     ret = esp_bt_controller_mem_release(ESP_BT_MODE_BLE);
     if (ret)
     {
         ESP_LOGW(tag, "Bluetooth controller release ble memory failed, skipping");
     }
-    // Initialize vhci
-    if (esp_bt_controller_init(&bt_cfg) != ESP_OK)
-    {
-        ESP_LOGW(tag, "Bluetooth controller initialize failed, skipping");
-    }
-    // Set controller mode to Bluetooth classic
+    // Start BT
     if (!start_bt())
     {
         ESP_LOGE(tag, "Bluetooth controller enable failed");
