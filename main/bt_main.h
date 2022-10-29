@@ -2,7 +2,7 @@
 
 #ifdef __cplusplus
 extern "C" {
-#endif // _cplusplus
+#endif // __cplusplus
 
 #include <stdio.h>
 #include <string.h>
@@ -194,4 +194,4 @@ char pin[] = "1234";
 
 #ifdef __cplusplus
 }
-#endif // _cplusplus
+#endif // __cplusplus
