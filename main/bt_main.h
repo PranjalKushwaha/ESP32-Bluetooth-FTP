@@ -1,4 +1,9 @@
 #pragma once
+
+#ifdef __cplusplus
+extern "C" {
+#endif // _cplusplus
+
 #include <stdio.h>
 #include <string.h>
 
@@ -187,3 +192,6 @@ uint16_t const crc16_table[256] = {
 //Pairing pin
 char pin[] = "1234";
 
+#ifdef __cplusplus
+}
+#endif // _cplusplus

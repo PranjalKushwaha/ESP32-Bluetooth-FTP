@@ -920,6 +920,36 @@ void btAdvtTask(void *pvParameters)
     }
 }
 
+// code originated in esp32-hal-bt.c: bool btStart(void)
+static bool start_bt(void)
+{
+    esp_bt_controller_config_t cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
+    if (esp_bt_controller_get_status() == ESP_BT_CONTROLLER_STATUS_ENABLED)
+    {
+        return true;
+    }
+    if (esp_bt_controller_get_status() == ESP_BT_CONTROLLER_STATUS_IDLE)
+    {
+        esp_bt_controller_init(&cfg);
+        while (esp_bt_controller_get_status() == ESP_BT_CONTROLLER_STATUS_IDLE)
+            ;
+    }
+    if (esp_bt_controller_get_status() == ESP_BT_CONTROLLER_STATUS_INITED)
+    {
+        if (esp_bt_controller_enable(ESP_BT_MODE_CLASSIC_BT))
+        {
+            ESP_LOGE(tag, "BT Enable failed");
+            return false;
+        }
+    }
+    if (esp_bt_controller_get_status() == ESP_BT_CONTROLLER_STATUS_ENABLED)
+    {
+        return true;
+    }
+    ESP_LOGE(tag, "BT Start failed");
+    return false;
+}
+
 void init_bt()
 {
     /* Initialize NVS — it is used to store PHY calibration data */
@@ -936,21 +966,17 @@ void init_bt()
     ret = esp_bt_controller_mem_release(ESP_BT_MODE_BLE);
     if (ret)
     {
-        ESP_LOGI(tag, "Bluetooth controller release ble memory failed");
-        return;
+        ESP_LOGW(tag, "Bluetooth controller release ble memory failed, skipping");
     }
     // Initialize vhci
     if (esp_bt_controller_init(&bt_cfg) != ESP_OK)
     {
-        ESP_LOGI(tag, "Bluetooth controller initialize failed");
-        return;
+        ESP_LOGW(tag, "Bluetooth controller initialize failed, skipping");
     }
     // Set controller mode to Bluetooth classic
-    ret = esp_bt_controller_enable(ESP_BT_MODE_CLASSIC_BT);
-    if (ret != ESP_OK)
+    if (!start_bt())
     {
-        ESP_LOGI(tag, "Bluetooth controller enable failed");
-        ESP_LOGI(tag, " err  %s", esp_err_to_name(ret));
+        ESP_LOGE(tag, "Bluetooth controller enable failed");
         return;
     }
     // Register the host and controller callbacks
