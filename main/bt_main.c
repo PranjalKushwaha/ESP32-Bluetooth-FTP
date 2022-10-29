@@ -388,7 +388,7 @@ void __attribute__((weak)) obex_ftp(uint8_t *packet, uint16_t len)
                 {
                     /*
                      * To store the recieved file malloc memory of size "file_len".
-                     * 
+                     *
                      */
                     uint16_t head_len = packet[i + 1] * 256 + packet[i + 2];
                     // printf("File contents : \n");
@@ -976,18 +976,36 @@ static bool start_bt(void)
     }
     if (esp_bt_controller_get_status() == ESP_BT_CONTROLLER_STATUS_INITED)
     {
+
+#ifdef CONFIG_BTDM_CTRL_MODE_BTDM // If dual mode enble BLE also
+        if (esp_bt_controller_enable(ESP_BT_MODE_CLASSIC_BT | ESP_BT_MODE_BLE))
+        {
+            ESP_LOGE(tag, "BT Enable failed");
+            return false;
+        }
+#endif
+
+#ifdef CONFIG_BTDM_CTRL_MODE_BR_EDR_ONLY
         if (esp_bt_controller_enable(ESP_BT_MODE_CLASSIC_BT))
         {
             ESP_LOGE(tag, "BT Enable failed");
             return false;
         }
+#endif
+
+#ifdef CONFIG_BTDM_CTRL_MODE_BLE_ONLY
+        ESP_LOGE(tag, "Please enable BR/EDR mode");
+        return false;
+#endif
+
+        if (esp_bt_controller_get_status() == ESP_BT_CONTROLLER_STATUS_ENABLED)
+        {
+            return true;
+        }
+        ESP_LOGE(tag, "BT Start failed");
+        return false;
     }
-    if (esp_bt_controller_get_status() == ESP_BT_CONTROLLER_STATUS_ENABLED)
-    {
-        return true;
-    }
-    ESP_LOGE(tag, "BT Start failed");
-    return false;
+    return true;
 }
 
 void init_bt()
@@ -1000,13 +1018,17 @@ void init_bt()
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
-    
+
     // Release BLE memory
+
+#ifdef CONFIG_BTDM_CTRL_MODE_BR_EDR_ONLY // Release BLE memory only if controller is set to BR/EDR only
     ret = esp_bt_controller_mem_release(ESP_BT_MODE_BLE);
     if (ret)
     {
         ESP_LOGW(tag, "Bluetooth controller release ble memory failed, skipping");
     }
+#endif
+
     // Start BT
     if (!start_bt())
     {
