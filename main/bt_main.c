@@ -997,15 +997,13 @@ static bool start_bt(void)
         ESP_LOGE(tag, "Please enable BR/EDR mode");
         return false;
 #endif
-
-        if (esp_bt_controller_get_status() == ESP_BT_CONTROLLER_STATUS_ENABLED)
-        {
-            return true;
-        }
-        ESP_LOGE(tag, "BT Start failed");
-        return false;
     }
-    return true;
+    if (esp_bt_controller_get_status() == ESP_BT_CONTROLLER_STATUS_ENABLED)
+    {
+        return true;
+    }
+    ESP_LOGE(tag, "BT Start failed");
+    return false;
 }
 
 void init_bt()
