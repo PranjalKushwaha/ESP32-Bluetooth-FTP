@@ -12,6 +12,14 @@ extern "C" {
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+#ifdef CONFIG_BTDM_CONTROLLER_MODE_BTDM
+#define BT_MODE ESP_BT_MODE_BTDM
+#elif defined(CONFIG_BTDM_CONTROLLER_MODE_BR_EDR_ONLY)
+#define BT_MODE ESP_BT_MODE_CLASSIC_BT
+#else
+#error BR/EDR mode must be enabled
+#endif
+
 /*  HCI Command opcode group field(OGF) */
 #define HCI_GRP_HOST_CONT_BASEBAND_CMDS (0x03 << 10) /* 0x0C00 */
 

@@ -976,27 +976,11 @@ static bool start_bt(void)
     }
     if (esp_bt_controller_get_status() == ESP_BT_CONTROLLER_STATUS_INITED)
     {
-
-#ifdef CONFIG_BTDM_CTRL_MODE_BTDM // If dual mode enble BLE also
-        if (esp_bt_controller_enable(ESP_BT_MODE_CLASSIC_BT | ESP_BT_MODE_BLE))
+        if (esp_bt_controller_enable(BT_MODE))
         {
             ESP_LOGE(tag, "BT Enable failed");
             return false;
         }
-#endif
-
-#ifdef CONFIG_BTDM_CTRL_MODE_BR_EDR_ONLY
-        if (esp_bt_controller_enable(ESP_BT_MODE_CLASSIC_BT))
-        {
-            ESP_LOGE(tag, "BT Enable failed");
-            return false;
-        }
-#endif
-
-#ifdef CONFIG_BTDM_CTRL_MODE_BLE_ONLY
-        ESP_LOGE(tag, "Please enable BR/EDR mode");
-        return false;
-#endif
     }
     if (esp_bt_controller_get_status() == ESP_BT_CONTROLLER_STATUS_ENABLED)
     {
