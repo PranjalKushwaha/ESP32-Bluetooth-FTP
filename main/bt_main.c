@@ -13,6 +13,8 @@ uint16_t dest_cid = 0x41; // L2CAP Destination id, incremented for each new conn
 
 uint16_t mtu = 0; // Stores the most recently agreed MTU value
 uint16_t obex_conn_id = 1;
+
+
 uint8_t *file_name;
 uint32_t file_ptr = 0; // Mark current recieve index
 uint32_t file_len = -1;
@@ -87,7 +89,7 @@ void init_queue()
 void queue_packet(uint8_t *packet)
 {
     while (xQueueSend(queue_handle, packet, 0) != pdTRUE)
-        ;
+        vTaskDelay(10 / portTICK_PERIOD_MS);
     if (DEBUG)
     {
         // Each packet has the first two bytes store its length
@@ -285,6 +287,10 @@ void conf_req(uint8_t *buf, uint8_t *packet, uint16_t len)
  * For OBEX packet format refer the IRDA spec:
  * https://btprodspecificationrefs.blob.core.windows.net/ext-ref/IrDA/OBEX15.pdf
  */
+
+int pending_packs[100]; //Stores tx_seq of rejected packets.
+int num_pending_packs = 0;
+
 void __attribute__((weak)) obex_ftp(uint8_t *packet, uint16_t len)
 {
     uint16_t pack_len = 0;
@@ -300,7 +306,63 @@ void __attribute__((weak)) obex_ftp(uint8_t *packet, uint16_t len)
     uint8_t obex_txseq = packet[9] & 0b01111110;   // Recieved TX seq
 
     uint8_t frame_type = packet[9] & 0b00000001; // Obex frame type
-    if (((obex_txseq >> 1) + 1) % 8 == 0)        // Send a recieved acknowledgement after every 8 packets
+
+    uint16_t calc_fcs = crc16(0, &packet[5], len - 7);           // Calculated from packet contents
+    uint16_t recv_fcs = packet[len - 1] * 256 + packet[len - 2]; // Calculated by sender
+    int num = num_pending_packs;
+
+    int count = 0;
+    for (int i = 0; i < num; i++) //If previously rejected packet is recieved again remove from rejected list
+    {
+        if (pending_packs[i] == obex_txseq)
+        {
+            for (int j = i; j < num_pending_packs; j++)
+            {
+                pending_packs[j] = pending_packs[j + 1];
+                count++;
+            }
+            num_pending_packs--;
+            break;
+        }
+        count ++;
+    }
+   // printf("count  : %d\n",count);
+
+    if (calc_fcs != recv_fcs || len!=5+packet[4]*256+packet[3]) //If packet corrupted or partially recieved
+    {
+        //printf("Recieved length %d ",len);
+        // printf("L2cap length %d\n",packet[4]*256+packet[3]);
+        
+        // for(int i = 0;i<len + 5;i++)
+        // {
+        //     printf(" i:%d ",i);
+        //     printf("%02x ",packet[i]);
+        // }
+        // //printf("Sizeof : %d\n",sizeof(packet)/sizeof(uint8_t));
+        // fflush(stdout);
+        pending_packs[num_pending_packs] = obex_txseq; //Rejected
+        num_pending_packs++;
+        pack_len = 13;
+        UINT8_TO_STREAM(buf, pack_len / 256);
+        UINT8_TO_STREAM(buf, pack_len % 256);
+        UINT8_TO_STREAM(buf, H4_TYPE_ACL);
+        UINT16_TO_STREAM(buf, acl_flags);
+        UINT16_TO_STREAM(buf, 8);
+        UINT16_TO_STREAM(buf, 4);
+        UINT16_TO_STREAM(buf, src_cid);
+        UINT8_TO_STREAM(buf, 13)
+        uint8_t tx = ((obex_txseq >> 1));
+        UINT8_TO_STREAM(buf, tx);
+
+        fcs = crc16(0, &cmd_buf[7], 6);
+        UINT16_TO_STREAM(buf, fcs);
+
+        queue_packet(cmd_buf);
+
+        return;
+    }
+    
+    if (((obex_txseq >> 1) + 1) % 8 == 0) // Send a recieved acknowledgement after every 8 packets
     {
         pack_len = 13;
         UINT8_TO_STREAM(buf, pack_len / 256);
@@ -357,6 +419,7 @@ void __attribute__((weak)) obex_ftp(uint8_t *packet, uint16_t len)
             // Parse packet using a loop
             for (int i = 14; i < len - 2;)
             {
+                vTaskDelay(10/portTICK_PERIOD_MS);
                 // Segment contains connection id
                 if (packet[i] == 0xcb)
                 {
@@ -433,26 +496,30 @@ void __attribute__((weak)) obex_ftp(uint8_t *packet, uint16_t len)
                 // End of body packet
                 else if (packet[i] == 0x49)
                 {
-                    send = 1;
-                    pack_len = 16;
-                    UINT8_TO_STREAM(buf, pack_len / 256);
-                    UINT8_TO_STREAM(buf, pack_len % 256);
-                    UINT8_TO_STREAM(buf, H4_TYPE_ACL);
-                    UINT16_TO_STREAM(buf, acl_flags);
-                    UINT16_TO_STREAM(buf, 11);
-                    UINT16_TO_STREAM(buf, 7);
-                    UINT16_TO_STREAM(buf, src_cid);
-                    UINT8_TO_STREAM(buf, obex_reqseq << 1);
-                    UINT8_TO_STREAM(buf, (obex_txseq >> 1) + 1);
-                    UINT8_TO_STREAM(buf, 0xa0);
-                    UINT8_TO_STREAM(buf, 0x00);
-                    UINT8_TO_STREAM(buf, 0x03);
-                    fcs = crc16(0, &cmd_buf[7], 9);
-                    UINT16_TO_STREAM(buf, fcs); // FCS
-                    i += 3;
-                    printf("File recieved successfully\n");
-                    printf("File sum : %lld\n", file_sum);
-                    fflush(stdout);
+                    if (num_pending_packs == 0) //End only if no retransmissions expected
+                    {
+                        send = 1;
+                        pack_len = 16;
+                        UINT8_TO_STREAM(buf, pack_len / 256);
+                        UINT8_TO_STREAM(buf, pack_len % 256);
+                        UINT8_TO_STREAM(buf, H4_TYPE_ACL);
+                        UINT16_TO_STREAM(buf, acl_flags);
+                        UINT16_TO_STREAM(buf, 11);
+                        UINT16_TO_STREAM(buf, 7);
+                        UINT16_TO_STREAM(buf, src_cid);
+                        UINT8_TO_STREAM(buf, obex_reqseq << 1);
+                        UINT8_TO_STREAM(buf, (obex_txseq >> 1) + 1);
+                        UINT8_TO_STREAM(buf, 0xa0);
+                        UINT8_TO_STREAM(buf, 0x00);
+                        UINT8_TO_STREAM(buf, 0x03);
+                        fcs = crc16(0, &cmd_buf[7], 9);
+                        UINT16_TO_STREAM(buf, fcs); // FCS
+                        i += 3;
+                        printf("File recieved successfully\n");
+                        printf("File sum : %lld\n", file_sum);
+                        fflush(stdout);
+                        file_sum = 0;
+                    }
                     // printf("End of file \n");
                 }
             }
@@ -652,7 +719,7 @@ void l2cap_cmd_handler(uint8_t *packet, uint16_t len)
                 UINT8_TO_STREAM(buf, 0x09);
                 UINT8_TO_STREAM(buf, 0x03);
                 UINT8_TO_STREAM(buf, 63);
-                UINT8_TO_STREAM(buf, 3);
+                UINT8_TO_STREAM(buf, 20);
                 UINT16_TO_STREAM(buf, 2000);
                 UINT16_TO_STREAM(buf, 12000);
                 UINT16_TO_STREAM(buf, 1012);
@@ -1038,7 +1105,7 @@ void init_bt()
     // Initialize the send queue(may fail and restart the chip)
     init_queue();
     // Create and start send task
-    xTaskCreatePinnedToCore(&send, "send", 2048, NULL, 5, NULL, 1);
+    xTaskCreatePinnedToCore(&send, "send", 2048, NULL, 5, NULL, 0);
     // Create and start advert task
     xTaskCreatePinnedToCore(&btAdvtTask, "btAdvtTask", 2048, NULL, 5, NULL, 1);
 }
